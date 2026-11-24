@@ -1,0 +1,55 @@
+context:
+  version: "1.28.9"
+
+package:
+  name: mpds-gst
+  version: ${{ version }}
+
+source:
+  git: https://github.com/GStreamer/cerbero.git
+  rev: b3fe06b21bca54d9cb57614a4de4b60cdcdf260b
+
+build:
+  number: 0
+  dynamic_linking:
+    rpaths:
+      - lib64/
+      - lib/
+  script: |
+    set -eu
+    cd "$SRC_DIR"
+    export CERBERO_UNINSTALLED=1
+    # Cerbero bootstraps its pinned Python build tools from upstream.
+    export PIP_NO_INDEX=false
+    ./cerbero-uninstalled bootstrap --system=yes --assume-yes
+    mkdir -p packages-output
+    ./cerbero-uninstalled package --artifact tarball -o "$SRC_DIR/packages-output" gstreamer-1.0
+    tar -xJf "$SRC_DIR"/packages-output/gstreamer-1.0-linux-*-${{ version }}.tar.xz -C "$PREFIX"
+    tar -xJf "$SRC_DIR"/packages-output/gstreamer-1.0-linux-*-${{ version }}-devel.tar.xz -C "$PREFIX"
+
+requirements:
+  build:
+    - python 3.12.*
+    - distro
+    - git
+  run:
+    # Cerbero's network/security plugins link to OpenSSL 3, which its SDK
+    # tarballs do not include. Conda resolves this transitively for consumers.
+    - openssl >=3,<4
+  run_constraints:
+    - gstreamer <0.0a0
+    - gst-plugins-base <0.0a0
+    - gst-plugins-good <0.0a0
+    - gst-plugins-bad <0.0a0
+    - gst-plugins-ugly <0.0a0
+    - gst-libav <0.0a0
+    - gst-plugins-rs <0.0a0
+
+tests:
+  - script:
+      - gst-inspect-1.0 --version
+      - gst-inspect-1.0 --exists fakesrc
+
+about:
+  summary: Single-package Conda distribution of the upstream Cerbero GStreamer SDK
+  homepage: https://gstreamer.freedesktop.org/
