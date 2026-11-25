@@ -22,28 +22,24 @@ outputs:
           if [ "${OS:-}" = Windows_NT ]; then
             cd "$(cygpath -u "$SRC_DIR")"
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/bootstrap-windows.ps1 -VSVersion 2022
-            cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 "$@"; }
+            cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 -c "$(cygpath -w "$RECIPE_DIR/mpds.cbc")" "$@"; }
           else
             cd "$SRC_DIR"
-            if [ "$(uname -s)" = Linux ]; then
-              for arch in x86_64 arm64; do
-                printf 'lib_suffix = ""\n' > "config/linux_${arch}.config"
-              done
-            fi
-            cerbero() { ./cerbero-uninstalled "$@"; }
+            cerbero() { ./cerbero-uninstalled -c "$RECIPE_DIR/mpds.cbc" "$@"; }
           fi
 
-          variants=nodebug,notestspackage,nopython,nogi,norust,nounwind,nox11,noalsa,nopulse,nocdparanoia,nov4l2,nova,nogtk,noqt5,noqt6
-          cerbero -v "$variants" bootstrap --system=yes --assume-yes
+          cerbero bootstrap --system=yes --assume-yes
           mkdir -p build
-          cerbero -v "$variants" package --artifact tarball -o "$PWD/build" gstreamer-1.0
-          cerbero -v "$variants" wipe --force --build-tools
+          cerbero package --artifact tarball -o "$PWD/build" gstreamer-1.0
+          cerbero wipe --force --build-tools
 
     requirements:
       build:
         - python 3.12.*
         - distro
         - git
+        - if: win
+          then: libarchive
 
   - package:
       name: mpds-gst
@@ -52,6 +48,7 @@ outputs:
       dynamic_linking:
         rpaths:
           - lib/
+          - lib64/
       script:
         interpreter: bash
         content: |
@@ -77,7 +74,25 @@ outputs:
     tests:
       - script:
           - gst-inspect-1.0 --version
-          - gst-inspect-1.0 --exists fakesrc
+          - gst-inspect-1.0 --exists x264enc
+          - gst-inspect-1.0 --exists x265enc
+          - gst-inspect-1.0 --exists avdec_h264
+          - gst-inspect-1.0 --exists avdec_h265
+          - gst-inspect-1.0 --exists rav1enc
+          - gst-inspect-1.0 --exists dav1ddec
+          - gst-inspect-1.0 --exists avenc_ffv1
+          - gst-inspect-1.0 --exists avdec_ffv1
+          - gst-inspect-1.0 --exists jpegenc
+          - gst-inspect-1.0 --exists jpegdec
+          - gst-inspect-1.0 --exists pngenc
+          - gst-inspect-1.0 --exists pngdec
+          - gst-launch-1.0 -q videotestsrc num-buffers=4 ! videoconvert ! x264enc ! h264parse ! avdec_h264 ! fakesink
+          - gst-launch-1.0 -q videotestsrc num-buffers=4 ! videoconvert ! rav1enc ! av1parse ! dav1ddec ! fakesink
+      - if: linux
+        then:
+          - script:
+              - gst-inspect-1.0 --exists --plugin video4linux2
+              - gst-inspect-1.0 --exists --plugin va
 
   - package:
       name: mpds-gst-devel

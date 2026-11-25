@@ -1,0 +1,11 @@
+variants.override([
+    'nodebug', 'notestspackage', 'nopython', 'nogi', 'rust', 'nounwind',
+    'nox11', 'noalsa', 'nopulse', 'nocdparanoia', 'nogtk', 'noqt5', 'noqt6',
+])
+
+if target_platform == 'linux':
+    variants.override(['v4l2', 'va'])
+
+    # https://gitlab.freedesktop.org/gstreamer/cerbero/-/work_items/590
+    if target_arch == 'arm64' and os.path.isdir('/usr/lib64/pkgconfig'):
+        os.environ['PKG_CONFIG_PATH'] = '/usr/lib64/pkgconfig'
