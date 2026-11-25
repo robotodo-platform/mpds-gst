@@ -6,8 +6,9 @@ recipe:
   version: ${{ version }}
 
 source:
-  git: https://github.com/GStreamer/cerbero.git
-  rev: 1.28.9
+  - git: https://github.com/GStreamer/cerbero.git
+    rev: 1.28.9
+  - path: mpds.cbc
 
 outputs:
   - staging:
@@ -15,23 +16,19 @@ outputs:
     build:
       script:
         interpreter: bash
-        content: |
-          set -eu
-          export CERBERO_UNINSTALLED=1 PIP_NO_INDEX=false
-
-          if [ "${OS:-}" = Windows_NT ]; then
-            cd "$(cygpath -u "$SRC_DIR")"
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/bootstrap-windows.ps1 -VSVersion 2022
-            cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 -c "$(cygpath -w "$RECIPE_DIR/mpds.cbc")" "$@"; }
-          else
-            cd "$SRC_DIR"
-            cerbero() { ./cerbero-uninstalled -c "$RECIPE_DIR/mpds.cbc" "$@"; }
-          fi
-
-          cerbero bootstrap --system=yes --assume-yes
-          mkdir -p build
-          cerbero package --artifact tarball -o "$PWD/build" gstreamer-1.0
-          cerbero wipe --force --build-tools
+        content:
+          - set -eu
+          - export CERBERO_UNINSTALLED=1 PIP_NO_INDEX=false
+          - if: win
+            then: |
+              powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/bootstrap-windows.ps1 -VSVersion 2022
+              cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 -c mpds.cbc "$@"; }
+            else: |
+              cerbero() { ./cerbero-uninstalled -c mpds.cbc "$@"; }
+          - cerbero bootstrap --system=yes --assume-yes
+          - mkdir -p build
+          - cerbero package --artifact tarball -o build gstreamer-1.0
+          - cerbero wipe --force --build-tools
 
     requirements:
       build:
@@ -51,17 +48,13 @@ outputs:
           - lib64/
       script:
         interpreter: bash
-        content: |
-          set -eu
-          if [ "${OS:-}" = Windows_NT ]; then
-            prefix=$(cygpath -u "$LIBRARY_PREFIX")
-            src=$(cygpath -u "$SRC_DIR")
-          else
-            prefix=$PREFIX
-            src=$SRC_DIR
-          fi
-          mkdir -p "$prefix"
-          tar -xJf "$src"/build/gstreamer-1.0-*-${{ version }}.tar.xz -C "$prefix"
+        content:
+          - set -eu
+          - if: win
+            then: prefix=$(cygpath -u "$LIBRARY_PREFIX")
+            else: prefix=$PREFIX
+          - mkdir -p "$prefix"
+          - tar -xJf build/gstreamer-1.0-*-${{ version }}.tar.xz -C "$prefix"
     requirements:
       run_constraints:
         - gstreamer <0.0a0
@@ -100,17 +93,13 @@ outputs:
     build:
       script:
         interpreter: bash
-        content: |
-          set -eu
-          if [ "${OS:-}" = Windows_NT ]; then
-            prefix=$(cygpath -u "$LIBRARY_PREFIX")
-            src=$(cygpath -u "$SRC_DIR")
-          else
-            prefix=$PREFIX
-            src=$SRC_DIR
-          fi
-          mkdir -p "$prefix"
-          tar -xJf "$src"/build/gstreamer-1.0-*-${{ version }}-devel.tar.xz -C "$prefix"
+        content:
+          - set -eu
+          - if: win
+            then: prefix=$(cygpath -u "$LIBRARY_PREFIX")
+            else: prefix=$PREFIX
+          - mkdir -p "$prefix"
+          - tar -xJf build/gstreamer-1.0-*-${{ version }}-devel.tar.xz -C "$prefix"
     requirements:
       run:
         - ${{ pin_subpackage('mpds-gst', exact=True) }}
