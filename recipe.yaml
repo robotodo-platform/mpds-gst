@@ -21,14 +21,20 @@ outputs:
           - export CERBERO_UNINSTALLED=1 PIP_NO_INDEX=false
           - if: win
             then: |
+              export CI=true
               powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/bootstrap-windows.ps1 -VSVersion 2022
-              cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 -c mpds.cbc "$@"; }
+              MSYS2_ARG_CONV_EXCL='*' powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
+                . ./tools/common.ps1
+                Remove-Item Env:MSYS2_ARG_CONV_EXCL
+                & "$(Get-MSYS2)\msys2_shell.cmd" -ucrt64 -defterm -no-start -here -use-full-path -lc "set -eu; ./cerbero-uninstalled -c mpds.cbc bootstrap --system=yes --assume-yes; mkdir -p build; ./cerbero-uninstalled -c mpds.cbc package --artifact tarball -o build gstreamer-1.0; ./cerbero-uninstalled -c mpds.cbc wipe --force --build-tools"
+                exit $LASTEXITCODE
+              '
             else: |
               cerbero() { ./cerbero-uninstalled -c mpds.cbc "$@"; }
-          - cerbero bootstrap --system=yes --assume-yes
-          - mkdir -p build
-          - cerbero package --artifact tarball -o build gstreamer-1.0
-          - cerbero wipe --force --build-tools
+              cerbero bootstrap --system=yes --assume-yes
+              mkdir -p build
+              cerbero package --artifact tarball -o build gstreamer-1.0
+              cerbero wipe --force --build-tools
 
     requirements:
       build:
