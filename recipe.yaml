@@ -1,55 +1,111 @@
 context:
   version: "1.28.9"
 
-package:
+recipe:
   name: mpds-gst
   version: ${{ version }}
 
 source:
   git: https://github.com/GStreamer/cerbero.git
-  rev: b3fe06b21bca54d9cb57614a4de4b60cdcdf260b
+  rev: 1.28.9
 
-build:
-  number: 0
-  dynamic_linking:
-    rpaths:
-      - lib64/
-      - lib/
-  script: |
-    set -eu
-    cd "$SRC_DIR"
-    export CERBERO_UNINSTALLED=1
-    # Cerbero bootstraps its pinned Python build tools from upstream.
-    export PIP_NO_INDEX=false
-    ./cerbero-uninstalled bootstrap --system=yes --assume-yes
-    mkdir -p packages-output
-    ./cerbero-uninstalled package --artifact tarball -o "$SRC_DIR/packages-output" gstreamer-1.0
-    tar -xJf "$SRC_DIR"/packages-output/gstreamer-1.0-linux-*-${{ version }}.tar.xz -C "$PREFIX"
-    tar -xJf "$SRC_DIR"/packages-output/gstreamer-1.0-linux-*-${{ version }}-devel.tar.xz -C "$PREFIX"
+outputs:
+  - staging:
+      name: mpds-gst-build
+    build:
+      script:
+        interpreter: bash
+        content: |
+          set -eu
+          export CERBERO_UNINSTALLED=1 PIP_NO_INDEX=false
 
-requirements:
-  build:
-    - python 3.12.*
-    - distro
-    - git
-  run:
-    # Cerbero's network/security plugins link to OpenSSL 3, which its SDK
-    # tarballs do not include. Conda resolves this transitively for consumers.
-    - openssl >=3,<4
-  run_constraints:
-    - gstreamer <0.0a0
-    - gst-plugins-base <0.0a0
-    - gst-plugins-good <0.0a0
-    - gst-plugins-bad <0.0a0
-    - gst-plugins-ugly <0.0a0
-    - gst-libav <0.0a0
-    - gst-plugins-rs <0.0a0
+          if [ "${OS:-}" = Windows_NT ]; then
+            cd "$(cygpath -u "$SRC_DIR")"
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/bootstrap-windows.ps1 -VSVersion 2022
+            cerbero() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./cerbero-uninstalled.ps1 "$@"; }
+          else
+            cd "$SRC_DIR"
+            if [ "$(uname -s)" = Linux ]; then
+              for arch in x86_64 arm64; do
+                printf 'lib_suffix = ""\n' > "config/linux_${arch}.config"
+              done
+            fi
+            cerbero() { ./cerbero-uninstalled "$@"; }
+          fi
 
-tests:
-  - script:
-      - gst-inspect-1.0 --version
-      - gst-inspect-1.0 --exists fakesrc
+          variants=nodebug,notestspackage,nopython,nogi,norust,nounwind,nox11,noalsa,nopulse,nocdparanoia,nov4l2,nova,nogtk,noqt5,noqt6
+          cerbero -v "$variants" bootstrap --system=yes --assume-yes
+          mkdir -p build
+          cerbero -v "$variants" package --artifact tarball -o "$PWD/build" gstreamer-1.0
+          cerbero -v "$variants" wipe --force --build-tools
+
+    requirements:
+      build:
+        - python 3.12.*
+        - distro
+        - git
+
+  - package:
+      name: mpds-gst
+    inherit: mpds-gst-build
+    build:
+      dynamic_linking:
+        rpaths:
+          - lib/
+      script:
+        interpreter: bash
+        content: |
+          set -eu
+          if [ "${OS:-}" = Windows_NT ]; then
+            prefix=$(cygpath -u "$LIBRARY_PREFIX")
+            src=$(cygpath -u "$SRC_DIR")
+          else
+            prefix=$PREFIX
+            src=$SRC_DIR
+          fi
+          mkdir -p "$prefix"
+          tar -xJf "$src"/build/gstreamer-1.0-*-${{ version }}.tar.xz -C "$prefix"
+    requirements:
+      run_constraints:
+        - gstreamer <0.0a0
+        - gst-plugins-base <0.0a0
+        - gst-plugins-good <0.0a0
+        - gst-plugins-bad <0.0a0
+        - gst-plugins-ugly <0.0a0
+        - gst-libav <0.0a0
+        - gst-plugins-rs <0.0a0
+    tests:
+      - script:
+          - gst-inspect-1.0 --version
+          - gst-inspect-1.0 --exists fakesrc
+
+  - package:
+      name: mpds-gst-devel
+    inherit: mpds-gst-build
+    build:
+      script:
+        interpreter: bash
+        content: |
+          set -eu
+          if [ "${OS:-}" = Windows_NT ]; then
+            prefix=$(cygpath -u "$LIBRARY_PREFIX")
+            src=$(cygpath -u "$SRC_DIR")
+          else
+            prefix=$PREFIX
+            src=$SRC_DIR
+          fi
+          mkdir -p "$prefix"
+          tar -xJf "$src"/build/gstreamer-1.0-*-${{ version }}-devel.tar.xz -C "$prefix"
+    requirements:
+      run:
+        - ${{ pin_subpackage('mpds-gst', exact=True) }}
+    tests:
+      - script:
+          - pkg-config --exact-version=${{ version }} gstreamer-1.0
+        requirements:
+          run:
+            - pkg-config
 
 about:
-  summary: Single-package Conda distribution of the upstream Cerbero GStreamer SDK
+  summary: Conda runtime and development outputs from the upstream Cerbero GStreamer SDK
   homepage: https://gstreamer.freedesktop.org/

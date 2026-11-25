@@ -1,8 +1,0 @@
-# Build environment only. The Conda recipe remains platform-neutral.
-ARG MANYLINUX_IMAGE=quay.io/pypa/manylinux_2_28_x86_64@sha256:55a36963bc0504cdf004011001c1072306402f0b8b83be5a5eba7068f93eec53
-FROM ghcr.io/prefix-dev/pixi:0.83.0 AS pixi
-
-FROM ${MANYLINUX_IMAGE}
-COPY --from=pixi /usr/local/bin/pixi /usr/local/bin/pixi
-
-WORKDIR /workspace

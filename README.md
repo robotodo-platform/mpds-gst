@@ -1,52 +1,54 @@
 # GStreamer Cerbero bridge
 
-`mpds-gst` is a **single Conda package** for the upstream GStreamer SDK
+`mpds-gst` provides Conda runtime and development packages for the upstream GStreamer SDK
 built by [Cerbero](https://gitlab.freedesktop.org/gstreamer/cerbero). Despite its
 package name, it does not depend on MPDS or contain MPDS-specific code.
 
-Pixi's Rattler-build backend checks out the complete upstream Cerbero Git tree
-at a pinned commit, builds its `gstreamer-1.0` SDK, and installs Cerbero's
-runtime and development archives into **one** Conda package. Cerbero controls
-the plugins and native dependencies; this repository has no plugin allowlist,
-downstream SDK staging code, Python wheel, or separate development package.
+Pixi's Rattler-build backend checks out the upstream Cerbero Git tree at a
+pinned commit and builds its full `gstreamer-1.0` SDK once, using Cerbero's
+upstream package selection. Cerbero itself
+separates runtime and development files into two tarballs. Rattler-build
+installs each tarball directly into its corresponding Conda output:
+`mpds-gst` for runtime and `mpds-gst-devel` for development files. The
+development output depends on its exact matching runtime build. Conda does
+not maintain a second file classification or retain the intermediate tarballs.
+
+Cerbero controls the plugins and native dependencies; this repository has
+no plugin allowlist or separate Python wheel.
 
 ## Build
 
 From this directory, with Pixi installed:
 
 ```sh
-pixi publish --path . --target-dir dist
+pixi exec -c conda-forge --spec rattler-build \
+  rattler-build build --experimental --recipe recipe.yaml \
+  --channel conda-forge --test native --output-dir dist
 ```
 
-For an x86-64 `manylinux_2_28` build, the ABI baseline is supplied
-by the container. Cerbero installs the distribution's system prerequisites
-through its own bootstrap; the Dockerfile does not duplicate that list:
+Rattler-build runs the tests defined in each output's `tests:` section in
+isolated environments as part of the build, and writes the packages under
+`dist/<platform>/`.
 
-```sh
-docker build -f Dockerfile.manylinux -t gstreamer-manylinux .
-docker run --rm \
-    --mount "type=bind,src=$PWD,dst=/workspace" \
-    gstreamer-manylinux \
-    pixi publish --path . --target-dir dist
-```
+Cerbero installs its platform prerequisites through upstream bootstrap.
+GitHub Actions builds both Linux architectures in the official manylinux 2.28
+containers (glibc 2.28), while Windows and macOS use native GitHub runners.
 
 This is a native-source build, not a repack of arbitrary conda-forge GStreamer
 libraries. Cerbero's upstream bootstrap requires network access to install its
-pinned build tools. The Conda recipe declares OpenSSL 3 as a transitive runtime
-dependency because the Cerbero SDK archives refer to its shared libraries.
+pinned build tools. Release validation must check the native shared-library
+dependencies of the complete SDK and confirm that they resolve after installation.
 The `run_constraints` prevent installation alongside the conda-forge GStreamer
 packages. Consumers depend on `mpds-gst` without selecting individual
 GStreamer plugin packages.
 
-## Validation still required
+## CI and publishing
 
-The project is currently a packaging bridge, **not a certified manylinux SDK**.
-The release process must verify the lowest possible glibc baseline and the
-complete library/codec plugin dependency closure on x86-64 and AArch64. Cerbero
-also needs all relevant system prerequisites for its target platform. Package
-relocation, plug-in discovery, development metadata and installed-prefix behavior
-must be tested before publishing. These validations must not be bypassed by
-excluding libraries from auditwheel or dropping upstream plugins.
+CI builds and tests `linux-64`, `linux-aarch64`, `win-64`, `osx-64`,
+and `osx-arm64`. Linux builds use manylinux 2.28 containers; Windows and macOS
+use native GitHub runners. Version tags trigger publication of the tested
+packages to Anaconda.org after every build passes. Configure
+`ANACONDA_OWNER` and `ANACONDA_API_KEY` in the GitHub `conda` environment.
 
 GStreamer's libraries and plugins retain their upstream licenses; the Cerbero
 package includes its upstream license notices.

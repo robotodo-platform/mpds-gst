@@ -1,0 +1,36 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conda-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: conda
+    steps:
+      - uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.83.0
+          run-install: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mpds-gst-*
+          path: dist
+          merge-multiple: true
+      - name: Publish tested packages
+        shell: bash
+        env:
+          ANACONDA_OWNER: ${{ vars.ANACONDA_OWNER }}
+          ANACONDA_API_KEY: ${{ secrets.ANACONDA_API_KEY }}
+        run: pixi upload anaconda dist/*/*.conda
