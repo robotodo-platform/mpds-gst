@@ -34,6 +34,9 @@ outputs:
               '
             else: |
               cerbero() { ./cerbero-uninstalled -c mpds.cbc "$@"; }
+              if [ "$(uname -s)" = Linux ]; then
+                printf '\nlib_suffix = ""\n' >> config/linux.config
+              fi
               cerbero bootstrap --system=yes --assume-yes
               mkdir -p build
               cerbero package --artifact tarball -o build gstreamer-1.0
