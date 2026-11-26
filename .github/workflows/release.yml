@@ -1,7 +1,7 @@
 name: Release
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -32,5 +32,6 @@ jobs:
         shell: bash
         env:
           ANACONDA_OWNER: ${{ vars.ANACONDA_OWNER }}
+          ANACONDA_CHANNEL: ${{ github.event.release.prerelease && 'dev' || 'main' }}
           ANACONDA_API_KEY: ${{ secrets.ANACONDA_API_KEY }}
         run: pixi upload anaconda dist/*/*.conda

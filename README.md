@@ -1,8 +1,8 @@
 # GStreamer Cerbero bridge
 
-`mpds-gst` provides Conda runtime and development packages for the upstream GStreamer SDK
-built by [Cerbero](https://gitlab.freedesktop.org/gstreamer/cerbero). Despite its
-package name, it does not depend on MPDS or contain MPDS-specific code.
+`mpds-gst` provides GStreamer runtime and development Conda packages for MPDS,
+built with upstream [Cerbero](https://gitlab.freedesktop.org/gstreamer/cerbero).
+It does not depend on MPDS or contain MPDS-specific code.
 
 Pixi's Rattler-build backend checks out the upstream Cerbero Git tree at a
 pinned commit and builds its full `gstreamer-1.0` SDK once, using Cerbero's
@@ -32,7 +32,7 @@ isolated environments as part of the build, and writes the packages under
 
 Cerbero installs its platform prerequisites through upstream bootstrap.
 GitHub Actions builds both Linux architectures in the official manylinux 2.28
-containers (glibc 2.28), while Windows and macOS use native GitHub runners.
+containers (glibc 2.28).
 
 This is a native-source build, not a repack of arbitrary conda-forge GStreamer
 libraries. Cerbero's upstream bootstrap requires network access to install its
@@ -44,11 +44,39 @@ GStreamer plugin packages.
 
 ## CI and publishing
 
-CI builds and tests `linux-64`, `linux-aarch64`, `win-64`, `osx-64`,
-and `osx-arm64`. Linux builds use manylinux 2.28 containers; Windows and macOS
-use native GitHub runners. Version tags trigger publication of the tested
-packages to Anaconda.org after every build passes. Configure
-`ANACONDA_OWNER` and `ANACONDA_API_KEY` in the GitHub `conda` environment.
+CI builds and tests `linux-64` and `linux-aarch64`. Windows and macOS are
+deferred until after MPDS v1a0. Publishing a GitHub release triggers the build
+and publication of tested packages to Anaconda.org after every build passes.
+Prereleases publish to the `dev` label; stable releases publish to `main`.
+Configure the GitHub `conda` environment with variable `ANACONDA_OWNER`
+and secret `ANACONDA_API_KEY`.
+
+The package version follows the upstream GStreamer version in `recipe.yaml`,
+which also selects the Cerbero revision. The Conda build number starts at `0`.
+Increment `build.number` for packaging changes at the same upstream version
+and reset it on upstream upgrades.
+Tag releases as `v<version>-<build number>` (for example, `v1.28.9-0`).
+Until MPDS v1a0, publish GitHub prereleases and use
+`robotodo-platform/label/dev::mpds-gst`. Promote validated packages to the
+`main` label for stable distribution.
 
 GStreamer's libraries and plugins retain their upstream licenses; the Cerbero
 package includes its upstream license notices.
+
+## Known issues
+
+Cerbero 1.28.9 has the following Linux runtime packaging issues on both
+x86-64 and AArch64:
+
+- OpenSSL (`libcrypto.so.3`, `libssl.so.3`) is intentionally omitted from native Linux runtime archives by `packages/base-crypto.package`. Consider an ABI-compatible Conda runtime dependency later.
+- `liba52.so` is classified as development-only, but `libgsta52dec.so` requires it at runtime. Report upstream.
+- `libgstva.so` requires `libgstva-1.0.so.0`, which is missing from the runtime archives. The upstream bad-plugins recipe omits the library declaration. Report upstream.
+
+Rattler-build preserves these upstream omissions. Fixes and manual library
+copying are deferred. Conda-forge builds individual GStreamer modules directly
+with Meson and uses Conda dependencies instead of Cerbero SDK archive classification.
+
+Evidence: [CI run 45565953029](https://github.com/robotodo-platform/mpds-gst/actions/runs/45565953029),
+[CI run 45657754522](https://github.com/robotodo-platform/mpds-gst/actions/runs/45657754522),
+and native Orin archive inspection. Separate ARM64 system discovery issue:
+[Cerbero #590](https://gitlab.freedesktop.org/gstreamer/cerbero/-/work_items/590).

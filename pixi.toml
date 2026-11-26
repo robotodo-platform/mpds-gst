@@ -6,7 +6,6 @@ preview = ["pixi-build"]
 
 [package]
 name = "mpds-gst"
-version = "1.28.9"
 
 [package.build]
 backend = { name = "pixi-build-rattler-build", version = "0.*", channels = ["https://prefix.dev/pixi-build-backends", "conda-forge"] }

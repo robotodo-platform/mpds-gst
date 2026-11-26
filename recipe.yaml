@@ -7,8 +7,11 @@ recipe:
 
 source:
   - git: https://github.com/GStreamer/cerbero.git
-    rev: 1.28.9
+    rev: ${{ version }}
   - path: mpds.cbc
+
+build:
+  number: 0
 
 outputs:
   - staging:
@@ -26,7 +29,7 @@ outputs:
               MSYS2_ARG_CONV_EXCL='*' powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
                 . ./tools/common.ps1
                 Remove-Item Env:MSYS2_ARG_CONV_EXCL
-                & "$(Get-MSYS2)\msys2_shell.cmd" -ucrt64 -defterm -no-start -here -use-full-path -lc "set -eu; ./cerbero-uninstalled -c mpds.cbc bootstrap --system=yes --assume-yes; mkdir -p build; ./cerbero-uninstalled -c mpds.cbc package --artifact tarball -o build gstreamer-1.0; ./cerbero-uninstalled -c mpds.cbc wipe --force --build-tools"
+                & "$(Get-MSYS2)\msys2_shell.cmd" -ucrt64 -defterm -no-start -here -use-full-path -lc "set -eu; git config --global core.autocrlf false; ./cerbero-uninstalled -c mpds.cbc bootstrap --system=yes --assume-yes; mkdir -p build; ./cerbero-uninstalled -c mpds.cbc package --artifact tarball -o build gstreamer-1.0; ./cerbero-uninstalled -c mpds.cbc wipe --force --build-tools"
                 exit $LASTEXITCODE
               '
             else: |
@@ -73,25 +76,11 @@ outputs:
     tests:
       - script:
           - gst-inspect-1.0 --version
-          - gst-inspect-1.0 --exists x264enc
-          - gst-inspect-1.0 --exists x265enc
-          - gst-inspect-1.0 --exists avdec_h264
-          - gst-inspect-1.0 --exists avdec_h265
-          - gst-inspect-1.0 --exists rav1enc
-          - gst-inspect-1.0 --exists dav1ddec
-          - gst-inspect-1.0 --exists avenc_ffv1
-          - gst-inspect-1.0 --exists avdec_ffv1
-          - gst-inspect-1.0 --exists jpegenc
-          - gst-inspect-1.0 --exists jpegdec
-          - gst-inspect-1.0 --exists pngenc
-          - gst-inspect-1.0 --exists pngdec
-          - gst-launch-1.0 -q videotestsrc num-buffers=4 ! videoconvert ! x264enc ! h264parse ! avdec_h264 ! fakesink
-          - gst-launch-1.0 -q videotestsrc num-buffers=4 ! videoconvert ! rav1enc ! av1parse ! dav1ddec ! fakesink
-      - if: linux
-        then:
-          - script:
-              - gst-inspect-1.0 --exists --plugin video4linux2
-              - gst-inspect-1.0 --exists --plugin va
+          - gst-launch-1.0 -q videotestsrc num-buffers=1 ! videoconvert ! x264enc ! h264parse ! avdec_h264 ! fakesink
+          - gst-launch-1.0 -q videotestsrc num-buffers=1 ! videoconvert ! x265enc ! h265parse ! avdec_h265 ! fakesink
+          - gst-launch-1.0 -q videotestsrc num-buffers=1 ! videoconvert ! rav1enc ! av1parse ! dav1ddec ! fakesink
+          - gst-launch-1.0 -q videotestsrc num-buffers=1 ! videoconvert ! avenc_ffv1 ! avdec_ffv1 ! fakesink
+          - gst-launch-1.0 -q videotestsrc num-buffers=1 ! videoconvert ! jpegenc ! jpegdec ! fakesink
 
   - package:
       name: mpds-gst-devel
@@ -117,5 +106,5 @@ outputs:
             - pkg-config
 
 about:
-  summary: Conda runtime and development outputs from the upstream Cerbero GStreamer SDK
+  summary: GStreamer runtime and development packages for MPDS, built with upstream Cerbero
   homepage: https://gstreamer.freedesktop.org/

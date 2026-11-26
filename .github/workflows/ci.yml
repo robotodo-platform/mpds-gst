@@ -22,15 +22,16 @@ jobs:
           - platform: linux-aarch64
             runner: ubuntu-24.04-arm
             container: quay.io/pypa/manylinux_2_28_aarch64:latest
-          - platform: win-64
-            runner: windows-2022
-            container: null
-          - platform: osx-64
-            runner: macos-15-intel
-            container: null
-          - platform: osx-arm64
-            runner: macos-15
-            container: null
+          # TODO
+          # - platform: win-64
+          #   runner: windows-2022
+          #   container: null
+          # - platform: osx-64
+          #   runner: macos-15-intel
+          #   container: null
+          # - platform: osx-arm64
+          #   runner: macos-15
+          #   container: null
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
     steps:
